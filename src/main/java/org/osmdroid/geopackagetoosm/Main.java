@@ -8,6 +8,7 @@ package org.osmdroid.geopackagetoosm;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.Console;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -107,54 +108,74 @@ public class Main {
                stmt.close();
           } catch (Exception ex) {
           }
-         
+
           TileFormatType tileType = null;
           String imageFormat = null;
           boolean rawImage = false;
           File geoPackageFile = null;
           String tileTable = null;
-         // File outputDirectory = null;
+          // File outputDirectory = null;
 
           Options opts = new Options();
-          opts.addOption("t",true, "geopackage - x and y represent GeoPackage Tile Matrix width and height, " +
-"standard - x and y origin is top left (Google format)," +
-"tms - (Tile Map Service) x and y origin is bottom left");
-          opts.addOption("i",true,"Output image format: png, jpg, jpeg (default is 'png')");
-          opts.addOption("raw",false,"Use the raw image bytes, only works when combining and cropping is not required");
-          opts.addOption("table",true, "the tile table to export");
-          opts.addOption("input",true, "geopackage_file");
-          opts.addOption("output",true, "output database file");
-          opts.addOption("list",true, "(geopackage), lists all tile tables");
-          opts.addOption("help", false,"help");
-          
+          opts.addOption("t", true, "geopackage - x and y represent GeoPackage Tile Matrix width and height, "
+               + "standard - x and y origin is top left (Google format),"
+               + "tms - (Tile Map Service) x and y origin is bottom left");
+          opts.addOption("i", true, "Output image format: png, jpg, jpeg (default is 'png')");
+          opts.addOption("raw", false, "Use the raw image bytes, only works when combining and cropping is not required");
+          opts.addOption("table", true, "the tile table to export");
+          opts.addOption("input", true, "geopackage_file");
+          opts.addOption("output", true, "output database file");
+          opts.addOption("list", true, "(geopackage), lists all tile tables");
+          opts.addOption("shift", false, "interactive z x y into an osm key");
+          opts.addOption("shift2", false, "interactive osm key into z x y");
+          opts.addOption("help", false, "help");
+
           CommandLineParser parser = new DefaultParser();
           CommandLine parse = parser.parse(opts, args);
-          if (parse.hasOption("help")){
+          if (parse.hasOption("help")) {
                HelpFormatter formatter = new HelpFormatter();
-               formatter.printHelp( "geopackageToOsm", opts );
+               formatter.printHelp("geopackageToOsm", opts);
                return;
           }
-           if (parse.hasOption("list")){
+          if (parse.hasOption("list")) {
                GeoPackage geoPackage = GeoPackageManager.open(new File(parse.getOptionValue("list")));
                Iterator<String> iterator = geoPackage.getTileTables().iterator();
-               while (iterator.hasNext()){
+               while (iterator.hasNext()) {
                     System.out.println(iterator.next());
                }
                return;
           }
+          if (parse.hasOption("shift")){
+               System.out.print("Z = ");
+               int z = Integer.parseInt(System.console().readLine());
+               System.out.print("Y = ");
+               int y = Integer.parseInt(System.console().readLine());
+               System.out.print("X = ");
+               int x = Integer.parseInt(System.console().readLine());
+               long key = ((z << z) + x << z) + y;
+               System.out.println(key);
+               return;
+          }
           
-          if (parse.hasOption("t"))
+          if (parse.hasOption("shift2")){
+               //int key = Integer.parseInt(System.console().readLine());
+               //long key = ((zoomLevel << zoomLevel) + x << zoomLevel) + y;
+               return;
+          }
+
+          if (parse.hasOption("t")) {
                tileType = TileFormatType.valueOf(parse.getOptionValue("t").toUpperCase());
-          if (parse.hasOption("i"))
+          }
+          if (parse.hasOption("i")) {
                imageFormat = (parse.getOptionValue("i"));
-          if (parse.hasOption("raw"))
+          }
+          if (parse.hasOption("raw")) {
                rawImage = true;
+          }
           geoPackageFile = new File(parse.getOptionValue("input"));
           //outputDirectory = new File(parse.getOptionValue("output"));
           tileTable = parse.getOptionValue("table");
-          
-         
-          
+
           {
                // Write the tiles
                try {
@@ -251,7 +272,6 @@ public class Main {
                     .getMatrixHeight()));
 
                //File zDirectory = new File(directory, String.valueOf(zoomLevel));
-
                int zoomCount = 0;
                switch (tileType) {
 
@@ -414,7 +434,6 @@ public class Main {
 
                // Build the z/x directory
                //File xDirectory = new File(zDirectory, String.valueOf(x));
-
                for (long y = tileGrid.getMinY(); y <= tileGrid.getMaxY(); y++) {
 
                     // Get the y file name for the specified format
@@ -425,8 +444,7 @@ public class Main {
                     }
 
                     //File imageFile = new File(xDirectory, String.valueOf(yFileName)
-                      //   + "." + imageFormat);
-
+                    //   + "." + imageFormat);
                     TileRow tileRow = null;
                     BufferedImage image = null;
                     if (rawImage) {
@@ -441,8 +459,7 @@ public class Main {
                     if (tileRow != null || image != null) {
 
                          // Make any needed directories for the image
-                        // xDirectory.mkdirs();
-
+                         // xDirectory.mkdirs();
                          long key = ((zoomLevel << zoomLevel) + x << zoomLevel) + y;
 
                          if (rawImage) {
@@ -454,7 +471,7 @@ public class Main {
                               prepareStatement.execute();
                               prepareStatement.close();
 
-						//FileOutputStream fos = new FileOutputStream(imageFile);
+                              //FileOutputStream fos = new FileOutputStream(imageFile);
                               //fos.write(tileRow.getTileData());
                               //fos.close();
                          } else {
@@ -465,7 +482,7 @@ public class Main {
                               baos.flush();
                               byte[] imageInByte = baos.toByteArray();
                               baos.close();
-                               //X/Y/Z 
+                              //X/Y/Z 
 
                               PreparedStatement prepareStatement = con.prepareStatement("insert into tiles (key,provider, tile) values (?,?,?);");
                               prepareStatement.setLong(1, key);
