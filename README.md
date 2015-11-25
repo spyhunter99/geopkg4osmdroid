@@ -12,8 +12,8 @@ Geopack support for OSMDroid
 
 ## List tile tables
 
-``` geopackageToOsm-<VERSION>-jar-with-dependencies.jar -list <INPUT>.gpkg 
+``` geopackageToOsm-<VERSION>-jar-with-dependencies.jar -list <INPUT>.gpkg ```
 
 ## Convert GeoPackage to OSMDroid sqlite database
 
-``` geopackageToOsm-<VERSION>-jar-with-dependencies.jar -t standard -input <INPUT>.gpkg -t standard -table <TABLE> -i jpg -o <OUTPUT.sqlite>
+``` geopackageToOsm-<VERSION>-jar-with-dependencies.jar -t standard -input <INPUT>.gpkg -t standard -table <TABLE> -i jpg -o <OUTPUT.sqlite>```
