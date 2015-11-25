@@ -8,7 +8,6 @@ package org.osmdroid.geopackagetoosm;
 import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
-import java.io.Console;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -46,7 +45,8 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 
 /**
- *
+ * This is based off of NGA's Geopackage TileWriter class. Modified to be a bit more use friendly and to write
+ * output files into OSMDroid compatible sqlite databases
  * @author alex
  */
 public class Main {
@@ -101,33 +101,24 @@ public class Main {
       */
      public static void main(String[] args) throws Exception {
 
-          con = DriverManager.getConnection("jdbc:sqlite:output.db");
-          try {
-               Statement stmt = con.createStatement();
-               stmt.executeUpdate("CREATE TABLE tiles (key INTEGER PRIMARY KEY, provider TEXT, tile BLOB);");
-               stmt.close();
-          } catch (Exception ex) {
-          }
-
           TileFormatType tileType = null;
           String imageFormat = null;
           boolean rawImage = false;
           File geoPackageFile = null;
           String tileTable = null;
-          // File outputDirectory = null;
+          String outputFile = "";
 
           Options opts = new Options();
           opts.addOption("t", true, "geopackage - x and y represent GeoPackage Tile Matrix width and height, "
                + "standard - x and y origin is top left (Google format),"
                + "tms - (Tile Map Service) x and y origin is bottom left");
-          opts.addOption("i", true, "Output image format: png, jpg, jpeg (default is 'png')");
+          opts.addOption("i", true, "Output image format: png, jpg, jpeg (default is 'jpg')");
           opts.addOption("raw", false, "Use the raw image bytes, only works when combining and cropping is not required");
           opts.addOption("table", true, "the tile table to export");
           opts.addOption("input", true, "geopackage_file");
           opts.addOption("output", true, "output database file");
           opts.addOption("list", true, "(geopackage), lists all tile tables");
           opts.addOption("shift", false, "interactive z x y into an osm key");
-          opts.addOption("shift2", false, "interactive osm key into z x y");
           opts.addOption("help", false, "help");
 
           CommandLineParser parser = new DefaultParser();
@@ -145,7 +136,7 @@ public class Main {
                }
                return;
           }
-          if (parse.hasOption("shift")){
+          if (parse.hasOption("shift")) {
                System.out.print("Z = ");
                int z = Integer.parseInt(System.console().readLine());
                System.out.print("Y = ");
@@ -156,36 +147,49 @@ public class Main {
                System.out.println(key);
                return;
           }
-          
-          if (parse.hasOption("shift2")){
-               //int key = Integer.parseInt(System.console().readLine());
-               //long key = ((zoomLevel << zoomLevel) + x << zoomLevel) + y;
-               return;
-          }
 
           if (parse.hasOption("t")) {
                tileType = TileFormatType.valueOf(parse.getOptionValue("t").toUpperCase());
+          } else {
+               tileType = TileFormatType.STANDARD;
           }
           if (parse.hasOption("i")) {
                imageFormat = (parse.getOptionValue("i"));
+          } else {
+               imageFormat = "jpg";
           }
           if (parse.hasOption("raw")) {
                rawImage = true;
           }
+          if (parse.hasOption("output")) {
+               outputFile = parse.getOptionValue("output");
+          } else {
+               outputFile = "out.sqlite";
+          }
+
+          con = DriverManager.getConnection("jdbc:sqlite:output.db");
+          try {
+               Statement stmt = con.createStatement();
+               stmt.executeUpdate("CREATE TABLE tiles (key INTEGER PRIMARY KEY, provider TEXT, tile BLOB);");
+               stmt.close();
+          } catch (Exception ex) {
+          }
+
           geoPackageFile = new File(parse.getOptionValue("input"));
+          if (!geoPackageFile.exists()) {
+               System.err.println(geoPackageFile.getAbsolutePath() + " does not exist!");
+               return;
+          }
           //outputDirectory = new File(parse.getOptionValue("output"));
           tileTable = parse.getOptionValue("table");
 
-          {
-               // Write the tiles
-               try {
-                    writeTiles(geoPackageFile, tileTable, null,
-                         imageFormat, tileType, rawImage);
-               } catch (Exception e) {
-                    printUsage();
-                    throw e;
-               }
+          // Write the tiles
+          try {
+               writeTiles(geoPackageFile, tileTable, null,imageFormat, tileType, rawImage);
+          } catch (Exception e) {
+               throw e;
           }
+          con.close();
 
      }
 
@@ -460,6 +464,7 @@ public class Main {
 
                          // Make any needed directories for the image
                          // xDirectory.mkdirs();
+                         //((z << z) + x << z) + y
                          long key = ((zoomLevel << zoomLevel) + x << zoomLevel) + y;
 
                          if (rawImage) {
@@ -477,6 +482,7 @@ public class Main {
                          } else {
                               // Write the image to the file
                               ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
                               ImageIO.write(image, imageFormat, baos);
                               //ImageIO.write(image, imageFormat, imageFile);
                               baos.flush();
@@ -506,65 +512,4 @@ public class Main {
           return tileCount;
      }
 
-     /**
-      * Print usage for the main method
-      */
-     private static void printUsage() {
-          System.out.println();
-          System.out.println("USAGE");
-          System.out.println();
-          System.out.println("\t[" + ARGUMENT_PREFIX + ARGUMENT_TILE_TYPE
-               + " tile_type] [" + ARGUMENT_PREFIX + ARGUMENT_IMAGE_FORMAT
-               + " image_format] [" + ARGUMENT_PREFIX + ARGUMENT_RAW_IMAGE
-               + "] geopackage_file tile_table output_directory");
-          System.out.println();
-          System.out.println("DESCRIPTION");
-          System.out.println();
-          System.out
-               .println("\tWrites a tile set from within a GeoPackage tile table to the file system in a z/x/y folder system according to the specified tile type");
-          System.out.println();
-          System.out.println("ARGUMENTS");
-          System.out.println();
-          System.out.println("\t" + ARGUMENT_PREFIX + ARGUMENT_TILE_TYPE
-               + " tile_type");
-          System.out
-               .println("\t\tTile output format specifying z/x/y folder organization: "
-                    + TileFormatType.GEOPACKAGE.name().toLowerCase()
-                    + ", "
-                    + TileFormatType.STANDARD.name().toLowerCase()
-                    + ", "
-                    + TileFormatType.TMS.name().toLowerCase()
-                    + " (Default is "
-                    + DEFAULT_TILE_TYPE.name().toLowerCase() + ")");
-          System.out
-               .println("\t\t\t"
-                    + TileFormatType.GEOPACKAGE.name().toLowerCase()
-                    + " - x and y represent GeoPackage Tile Matrix width and height");
-          System.out.println("\t\t\t"
-               + TileFormatType.STANDARD.name().toLowerCase()
-               + " - x and y origin is top left (Google format)");
-          System.out.println("\t\t\t" + TileFormatType.TMS.name().toLowerCase()
-               + " - (Tile Map Service) x and y origin is bottom left");
-          System.out.println();
-          System.out.println("\t" + ARGUMENT_PREFIX + ARGUMENT_IMAGE_FORMAT
-               + " image_format");
-          System.out
-               .println("\t\tOutput image format: png, jpg, jpeg (default is '"
-                    + DEFAULT_IMAGE_FORMAT + "')");
-          System.out.println();
-          System.out.println("\t" + ARGUMENT_PREFIX + ARGUMENT_RAW_IMAGE);
-          System.out
-               .println("\t\tUse the raw image bytes, only works when combining and cropping is not required");
-          System.out.println();
-          System.out.println("\tgeopackage_file");
-          System.out
-               .println("\t\tpath to the GeoPackage file containing the tiles");
-          System.out.println();
-          System.out.println("\ttile_table");
-          System.out.println("\t\ttile table name within the GeoPackage file");
-          System.out.println();
-          System.out.println("\toutput_directory");
-          System.out.println("\t\toutput directory to write the tile images to");
-          System.out.println();
-     }
 }
