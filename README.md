@@ -1,5 +1,5 @@
 # geopkg4osmdroid
-Geopack support for OSMDroid
+Geopack support for OSMDroid by way of conversion to osmdroid's sqlite format (for performance reasons)
 
 # Compile
 ```mvn clean install ```
